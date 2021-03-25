@@ -16,7 +16,9 @@ func parseDN(dn string) map[string]string {
 	if dn != "" {
 		for _, segment := range strings.Split(dn, ", ") {
 			parts := strings.SplitN(segment, "=", 2)
-			out[parts[0]] = parts[1]
+			if len(parts) >= 2 {
+				out[parts[0]] = parts[1]
+			}
 		}
 	}
 	return out
