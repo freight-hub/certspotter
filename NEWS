@@ -1,3 +1,25 @@
+v0.14.0 (2022-06-13)
+  * Switch to Go module versioning conventions.
+
+v0.13 (2022-06-13)
+  * Reduce minimum Go version to 1.17.
+  * Update install instructions.
+
+v0.12 (2022-06-07)
+  * Retry failed log requests.  This should make certspotter resilient
+    to rate limiting by logs.
+  * Add -version flag.
+  * Eliminate unnecessary dependency. certspotter now depends only on
+    golang.org/x packages.
+  * Switch to Go modules.
+
+v0.11 (2021-08-17)
+  * Add support for contacting logs via HTTP proxies;
+    just set the appropriate environment variable as documented at
+    https://golang.org/pkg/net/http/#ProxyFromEnvironment
+  * Work around RFC 6962 ambiguity related to consistency proofs
+    for empty trees.
+
 v0.10 (2020-04-29)
   * Improve speed by processing logs in parallel
   * Add -start_at_end option to begin monitoring new logs at the end,

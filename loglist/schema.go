@@ -11,11 +11,14 @@ package loglist
 
 import (
 	"time"
+
+	"software.sslmate.com/src/certspotter/ct"
 )
 
 type List struct {
-	Version   string     `json:"version"`
-	Operators []Operator `json:"operators"`
+	Version          string     `json:"version"`
+	LogListTimestamp time.Time  `json:"log_list_timestamp"` // Only present in v3 of schema
+	Operators        []Operator `json:"operators"`
 }
 
 type Operator struct {
@@ -25,18 +28,20 @@ type Operator struct {
 }
 
 type Log struct {
-	Key              []byte  `json:"key"`
-	LogID            []byte  `json:"log_id"`
-	MMD              int     `json:"mmd"`
-	URL              string  `json:"url"`
-	Description      string  `json:"description"`
-	State            State   `json:"state"`
-	DNS              string  `json:"dns"`
-	LogType          LogType `json:"log_type"`
+	Key              []byte        `json:"key"`
+	LogID            ct.SHA256Hash `json:"log_id"`
+	MMD              int           `json:"mmd"`
+	URL              string        `json:"url"`
+	Description      string        `json:"description"`
+	State            State         `json:"state"`
+	DNS              string        `json:"dns"`
+	LogType          LogType       `json:"log_type"`
 	TemporalInterval *struct {
 		StartInclusive time.Time `json:"start_inclusive"`
 		EndExclusive   time.Time `json:"end_exclusive"`
 	} `json:"temporal_interval"`
+
+	// TODO: add previous_operators
 }
 
 type State struct {
@@ -67,6 +72,14 @@ type State struct {
 	Rejected *struct {
 		Timestamp time.Time `json:"timestamp"`
 	} `json:"rejected"`
+}
+
+func (state *State) IsApproved() bool {
+	return state.Qualified != nil || state.Usable != nil || state.Readonly != nil
+}
+
+func (state *State) WasApprovedAt(t time.Time) bool {
+	return state.Retired != nil && t.Before(state.Retired.Timestamp)
 }
 
 type LogType string

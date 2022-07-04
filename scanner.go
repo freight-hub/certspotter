@@ -15,6 +15,7 @@ package certspotter
 import (
 	//	"container/list"
 	"bytes"
+	"context"
 	"crypto"
 	"errors"
 	"fmt"
@@ -29,11 +30,6 @@ import (
 )
 
 type ProcessCallback func(*Scanner, *ct.LogEntry)
-
-const (
-	FETCH_RETRIES    = 10
-	FETCH_RETRY_WAIT = 1
-)
 
 // ScannerOptions holds configuration options for the Scanner
 type ScannerOptions struct {
@@ -63,7 +59,7 @@ type Scanner struct {
 
 	// Public key of the log
 	publicKey crypto.PublicKey
-	LogId     []byte
+	LogId     ct.SHA256Hash
 
 	// Client used to talk to the CT log instance
 	logClient *client.LogClient
@@ -90,26 +86,12 @@ func (s *Scanner) processerJob(id int, certsProcessed *int64, entries <-chan ct.
 }
 
 func (s *Scanner) fetch(r fetchRange, entries chan<- ct.LogEntry, tree *CollapsedMerkleTree) error {
-	success := false
-	retries := FETCH_RETRIES
-	retryWait := FETCH_RETRY_WAIT
-	for !success {
+	for r.start <= r.end {
 		s.Log(fmt.Sprintf("Fetching entries %d to %d", r.start, r.end))
-		logEntries, err := s.logClient.GetEntries(r.start, r.end)
+		logEntries, err := s.logClient.GetEntries(context.Background(), r.start, r.end)
 		if err != nil {
-			if retries == 0 {
-				s.Warn(fmt.Sprintf("Problem fetching entries %d to %d from log: %s", r.start, r.end, err.Error()))
-				return err
-			} else {
-				s.Log(fmt.Sprintf("Problem fetching entries %d to %d from log (will retry): %s", r.start, r.end, err.Error()))
-				time.Sleep(time.Duration(retryWait) * time.Second)
-				retries--
-				retryWait *= 2
-				continue
-			}
+			return err
 		}
-		retries = FETCH_RETRIES
-		retryWait = FETCH_RETRY_WAIT
 		for _, logEntry := range logEntries {
 			if tree != nil {
 				tree.Add(hashLeaf(logEntry.LeafBytes))
@@ -117,12 +99,6 @@ func (s *Scanner) fetch(r fetchRange, entries chan<- ct.LogEntry, tree *Collapse
 			logEntry.Index = r.start
 			entries <- logEntry
 			r.start++
-		}
-		if r.start > r.end {
-			// Only complete if we actually got all the leaves we were
-			// expecting -- Logs MAY return fewer than the number of
-			// leaves requested.
-			success = true
 		}
 	}
 	return nil
@@ -194,7 +170,7 @@ func (s Scanner) Warn(msg string) {
 }
 
 func (s *Scanner) GetSTH() (*ct.SignedTreeHead, error) {
-	latestSth, err := s.logClient.GetSTH()
+	latestSth, err := s.logClient.GetSTH(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -207,19 +183,24 @@ func (s *Scanner) GetSTH() (*ct.SignedTreeHead, error) {
 			return nil, errors.New("STH signature is invalid: " + err.Error())
 		}
 	}
-	copy(latestSth.LogID[:], s.LogId)
+	latestSth.LogID = s.LogId
 	return latestSth, nil
 }
 
 func (s *Scanner) CheckConsistency(first *ct.SignedTreeHead, second *ct.SignedTreeHead) (bool, error) {
-	if first.TreeSize < second.TreeSize {
-		proof, err := s.logClient.GetConsistencyProof(int64(first.TreeSize), int64(second.TreeSize))
+	if first.TreeSize == 0 || second.TreeSize == 0 {
+		// RFC 6962 doesn't define how to generate a consistency proof in this case,
+		// and it doesn't matter anyways since the tree is empty.  The DigiCert logs
+		// return a 400 error if we ask for such a proof.
+		return true, nil
+	} else if first.TreeSize < second.TreeSize {
+		proof, err := s.logClient.GetConsistencyProof(context.Background(), int64(first.TreeSize), int64(second.TreeSize))
 		if err != nil {
 			return false, err
 		}
 		return VerifyConsistencyProof(proof, first, second), nil
 	} else if first.TreeSize > second.TreeSize {
-		proof, err := s.logClient.GetConsistencyProof(int64(second.TreeSize), int64(first.TreeSize))
+		proof, err := s.logClient.GetConsistencyProof(context.Background(), int64(second.TreeSize), int64(first.TreeSize))
 		if err != nil {
 			return false, err
 		}
@@ -236,7 +217,7 @@ func (s *Scanner) MakeCollapsedMerkleTree(sth *ct.SignedTreeHead) (*CollapsedMer
 		return &CollapsedMerkleTree{}, nil
 	}
 
-	entries, err := s.logClient.GetEntries(int64(sth.TreeSize-1), int64(sth.TreeSize-1))
+	entries, err := s.logClient.GetEntries(context.Background(), int64(sth.TreeSize-1), int64(sth.TreeSize-1))
 	if err != nil {
 		return nil, err
 	}
@@ -247,7 +228,7 @@ func (s *Scanner) MakeCollapsedMerkleTree(sth *ct.SignedTreeHead) (*CollapsedMer
 
 	var tree *CollapsedMerkleTree
 	if sth.TreeSize > 1 {
-		auditPath, _, err := s.logClient.GetAuditProof(leafHash, sth.TreeSize)
+		auditPath, _, err := s.logClient.GetAuditProof(context.Background(), leafHash, sth.TreeSize)
 		if err != nil {
 			return nil, err
 		}
@@ -311,7 +292,7 @@ func (s *Scanner) Scan(startIndex int64, endIndex int64, processCert ProcessCall
 
 // Creates a new Scanner instance using |client| to talk to the log, and taking
 // configuration options from |opts|.
-func NewScanner(logUri string, logId []byte, publicKey crypto.PublicKey, opts *ScannerOptions) *Scanner {
+func NewScanner(logUri string, logId ct.SHA256Hash, publicKey crypto.PublicKey, opts *ScannerOptions) *Scanner {
 	var scanner Scanner
 	scanner.LogUri = logUri
 	scanner.LogId = logId
