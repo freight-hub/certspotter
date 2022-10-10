@@ -1,5 +1,5 @@
 # build relevant binaries from source
-FROM golang:1.17 AS build-go
+FROM golang:1.19.2 AS build-go
 WORKDIR /src
 ADD . /src/
 RUN go install ./cmd/certspotter
