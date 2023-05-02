@@ -14,7 +14,7 @@ workflows:
           name: Build Image
           executor: build
           context: gcloud-registry
-          dockerfile: build/package/Dockerfile
+          dockerfile: Dockerfile
           registry-url: eu.gcr.io
           image: certspotter
           tag: ${CIRCLE_SHA1}
