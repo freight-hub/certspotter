@@ -1,0 +1,24 @@
+version: 2.1
+orbs:
+  gcp-gcr: circleci/gcp-gcr@0.15
+executors:
+  build:
+    docker:
+      - image: cimg/base:2023.04
+
+workflows:
+  ci-cd:
+    jobs:
+
+      - gcp-gcr/build-and-push-image:
+          name: Build Image
+          executor: build
+          context: gcloud-registry
+          dockerfile: build/package/Dockerfile
+          registry-url: eu.gcr.io
+          image: certspotter
+          tag: ${CIRCLE_SHA1}
+          # https://circleci.com/docs/2.0/building-docker-images/#docker-version
+          remote-docker-version: 20.10.18
+          setup-remote-docker: true
+          use-docker-layer-caching: true
