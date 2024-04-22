@@ -1,6 +1,6 @@
 version: 2.1
 orbs:
-  gcp-gcr: circleci/gcp-gcr@0.15
+  gcp-gcr: circleci/gcp-gcr@0.16
 executors:
   build:
     docker:
@@ -13,9 +13,10 @@ workflows:
       - gcp-gcr/build-and-push-image:
           name: Build Image
           executor: build
-          context: gcloud-registry
+          context: gcp-oidc-docker-registry
           dockerfile: Dockerfile
           registry-url: eu.gcr.io
+          use_oidc: true
           image: certspotter
           tag: ${CIRCLE_SHA1}
           # https://circleci.com/docs/2.0/building-docker-images/#docker-version
