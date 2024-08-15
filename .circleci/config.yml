@@ -13,11 +13,11 @@ workflows:
       - gcp-gcr/build-and-push-image:
           name: Build Image
           executor: build
-          context: gcp-oidc-docker-registry
+          context: gcp-oidc-artifact-registry
           dockerfile: Dockerfile
-          registry-url: eu.gcr.io
+          registry-url: europe-west1-docker.pkg.dev
           use_oidc: true
-          image: certspotter
+          image: docker/certspotter
           tag: ${CIRCLE_SHA1}
           # https://circleci.com/docs/2.0/building-docker-images/#docker-version
           remote-docker-version: default
