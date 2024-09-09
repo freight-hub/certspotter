@@ -2,6 +2,6 @@ module software.sslmate.com/src/certspotter
 
 go 1.17
 
-require golang.org/x/net v0.28.0
+require golang.org/x/net v0.29.0
 
-require golang.org/x/text v0.17.0 // indirect
+require golang.org/x/text v0.18.0 // indirect
