@@ -4,7 +4,7 @@ go 1.22
 
 require (
 	github.com/DataDog/datadog-go v4.8.3+incompatible
-	github.com/slack-go/slack v0.17.1
+	github.com/slack-go/slack v0.17.2
 )
 
 require (
